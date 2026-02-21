@@ -32,7 +32,6 @@ const schema: Schema = {
 const receiptRoutes = async (fastify: FastifyInstance) => {
     fastify.post('/receipt-scan', async (request, reply) => {
         const data: MultipartFile | undefined = await request.file()
-        console.log('api key',process.env.GEMINI_API_KEY)
 
         if (!data) {
             return reply.status(400).send({ error: 'No file uploaded' })

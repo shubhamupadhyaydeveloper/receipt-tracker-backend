@@ -1,8 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { MultipartFile } from '@fastify/multipart';
-// import pdfParse from 'pdf-parse';
-import { request } from 'http';
-import { recognize } from 'tesseract.js'
+import sharp from 'sharp'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { SchemaType } from '@google/generative-ai'
 import { Schema } from '@google/generative-ai'
@@ -41,10 +39,17 @@ const receiptRoutes = async (fastify: FastifyInstance) => {
         }
 
         const buffer = await data.toBuffer()
-        
+
+        // Step 1: Compress image with sharp to reduce Gemini token cost
+        const compressedImage = await sharp(buffer)
+            .resize({ width: 1024, withoutEnlargement: true })
+            .jpeg({ quality: 70 })
+            .toBuffer()
+
+        // Step 2: Send compressed image to Gemini for extraction
         const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string)
         const model = gemini.getGenerativeModel({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.0-flash-lite",
             generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: schema,
@@ -56,15 +61,15 @@ const receiptRoutes = async (fastify: FastifyInstance) => {
         try {
             const result = await model.generateContent([prompt, {
                 inlineData: {
-                    data: buffer.toString('base64'),
-                    mimeType: data.mimetype
+                    data: compressedImage.toString('base64'),
+                    mimeType: 'image/jpeg'
                 }
             }])
 
             const receiptData = JSON.parse(result.response.text());
             return reply.send(receiptData);
-        } catch (err: any) {
-            if (err?.status === 429) {
+        } catch (err: unknown) {
+            if (typeof err === 'object' && err !== null && 'status' in err && (err as { status: number }).status === 429) {
                 return reply.status(429).send({ error: 'Gemini API rate limit exceeded. Please wait and try again.' });
             }
             throw err;

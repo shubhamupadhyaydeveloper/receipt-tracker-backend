@@ -17,7 +17,7 @@ app.listen({port : 3001,host : "0.0.0.0"},(err, address) => {
     console.log(`Server listening at ${address}`)
 })
 
-app.get('/', async (request, reply) => {
+app.get('/', async (_req, _res) => {
     return { hello: 'hello world' }
 })
 

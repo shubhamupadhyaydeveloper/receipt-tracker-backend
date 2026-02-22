@@ -33,8 +33,6 @@ app.register(rateLimit, {
     }),
 })
 
-// ─── 3. API KEY AUTH ────────────────────────────────────────────────────────
-// All /api/* routes require the header: X-API-Key: <your secret>
 // Set API_KEY in your .env file. Your mobile app reads it from secure storage.
 app.addHook('onRequest', async (request, reply) => {
     if (!request.url.startsWith('/api')) return  // skip static files

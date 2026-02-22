@@ -26,7 +26,7 @@ const schema: Schema = {
             ],
         },
     },
-    required: ["vendorName", "totalAmount", "currency", "taxAmount"],
+    required: ["vendorName", "totalAmount", "currency", "taxAmount","date","category"],
 }
 
 const receiptRoutes = async (fastify: FastifyInstance) => {

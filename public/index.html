@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Receipt Tracker – Pricing</title>
+  <title>BillSnap – Pricing</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,10 +13,11 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f0f0f;
-      color: #f5f5f5;
+      background: #ffffff;
+      color: #111111;
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
     }
@@ -24,19 +25,33 @@
     .container {
       width: 100%;
       max-width: 420px;
-      padding: 24px 16px;
+      padding: 40px 20px 24px;
     }
 
-    .header { text-align: center; margin-bottom: 32px; }
-    .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
-    .header p  { color: #888; font-size: 15px; }
+    /* ── Logo + Brand ── */
+    .header { text-align: center; margin-bottom: 36px; }
+    .logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+    .logo-wrap img { width: 44px; height: 44px; border-radius: 10px; }
+    .brand-name {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #111111;
+    }
+    .header p { color: #888; font-size: 15px; margin-top: 6px; }
 
+    /* ── Toggle ── */
     .toggle {
       display: flex;
-      background: #1a1a1a;
+      background: #f0f0f0;
       border-radius: 12px;
       padding: 4px;
-      margin-bottom: 28px;
+      margin-bottom: 20px;
     }
     .toggle button {
       flex: 1;
@@ -51,22 +66,23 @@
       color: #888;
     }
     .toggle button.active {
-      background: #fff;
-      color: #000;
+      background: #111111;
+      color: #ffffff;
     }
 
+    /* ── Card ── */
     .card {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
+      background: #f8f8f8;
+      border: 1px solid #e5e5e5;
       border-radius: 16px;
       padding: 28px;
     }
 
     .badge {
       display: inline-block;
-      background: #22c55e22;
-      color: #22c55e;
-      border: 1px solid #22c55e44;
+      background: #dcfce7;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
       font-size: 12px;
       font-weight: 600;
       padding: 4px 10px;
@@ -75,36 +91,41 @@
     }
 
     .price { margin-bottom: 20px; }
-    .price .amount { font-size: 42px; font-weight: 800; }
+    .price .amount { font-size: 42px; font-weight: 800; color: #111111; }
     .price .period { font-size: 16px; color: #888; margin-left: 4px; }
     .price .original {
       font-size: 14px;
-      color: #555;
+      color: #aaa;
       text-decoration: line-through;
       margin-top: 4px;
     }
 
+    /* ── Features ── */
     .features { list-style: none; margin-bottom: 28px; }
     .features li {
       display: flex;
       align-items: center;
       gap: 10px;
       font-size: 14px;
-      color: #ccc;
-      padding: 6px 0;
+      color: #444;
+      padding: 7px 0;
+      border-bottom: 1px solid #efefef;
     }
+    .features li:last-child { border-bottom: none; }
     .features li::before {
       content: '✓';
-      color: #22c55e;
+      color: #16a34a;
       font-weight: 700;
       font-size: 13px;
+      flex-shrink: 0;
     }
 
+    /* ── Button ── */
     .pay-btn {
       width: 100%;
       padding: 14px;
-      background: #fff;
-      color: #000;
+      background: #111111;
+      color: #ffffff;
       font-size: 16px;
       font-weight: 700;
       border: none;
@@ -112,10 +133,17 @@
       cursor: pointer;
       transition: opacity 0.2s;
     }
-    .pay-btn:hover   { opacity: 0.88; }
+    .pay-btn:hover    { opacity: 0.82; }
     .pay-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .note { text-align: center; margin-top: 16px; font-size: 12px; color: #555; }
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+      color: #aaa;
+    }
+    .footer a { color: #888; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -171,7 +199,7 @@
             key: data.keyId,
             amount: data.amount,
             currency: data.currency,
-            name: 'Receipt Tracker',
+            name: 'BillSnap',
             description: `${plan.label} Subscription`,
             order_id: data.orderId,
             handler: async function (response) {
@@ -182,12 +210,12 @@
               });
               const result = await verify.json();
               if (result.success) {
-                alert('Payment successful! Thank you.');
+                alert('Payment successful! Welcome to BillSnap.');
               } else {
                 alert('Payment verification failed. Contact support.');
               }
             },
-            theme: { color: '#ffffff' },
+            theme: { color: '#111111' },
           };
 
           const rzp = new window.Razorpay(options);
@@ -202,8 +230,11 @@
       return (
         <div className="container">
           <div className="header">
-            <h1>Simple Pricing</h1>
-            <p>Start scanning receipts today</p>
+            <div className="logo-wrap">
+              <img src="/logo.png" alt="BillSnap logo" />
+              <span className="brand-name">BillSnap</span>
+            </div>
+            <p>Scan receipts. Track expenses. Effortlessly.</p>
           </div>
 
           <div className="toggle">
@@ -225,11 +256,13 @@
             </ul>
 
             <button className="pay-btn" onClick={handlePay} disabled={loading}>
-              {loading ? 'Processing…' : `Pay with Razorpay`}
+              {loading ? 'Processing…' : 'Get BillSnap'}
             </button>
           </div>
 
-          <p className="note">Secure payments powered by Razorpay</p>
+          <div className="footer">
+            <p>Secure payments by Razorpay &nbsp;·&nbsp; <a href="/privacy-policy.html">Privacy Policy</a></p>
+          </div>
         </div>
       );
     }

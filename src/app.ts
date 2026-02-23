@@ -14,7 +14,7 @@ const app = fastify({ logger: false })
 // Comma-separated list of allowed origins in .env:
 // ALLOWED_ORIGINS=https://your-app.com,https://another-domain.com
 // Use * to allow all (not recommended in production)
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
+const allowedOrigins = ( '*')
     .split(',')
     .map(o => o.trim())
 

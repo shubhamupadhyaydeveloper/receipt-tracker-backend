@@ -3,27 +3,12 @@ import path from 'path';
 import fastify from "fastify";
 import multipart from "@fastify/multipart";
 import staticFiles from "@fastify/static";
-import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import jwt from "jsonwebtoken";
 import receiptRoutes from "./routes/receipt-scan";
 import paymentRoutes from "./routes/payment";
 
 const app = fastify({ logger: false })
-
-// ─── 1. CORS ────────────────────────────────────────────────────────────────
-// Comma-separated list of allowed origins in .env:
-// ALLOWED_ORIGINS=https://your-app.com,https://another-domain.com
-// Use * to allow all (not recommended in production)
-const allowedOrigins = ( '*')
-    .split(',')
-    .map(o => o.trim())
-
-app.register(cors, {
-    origin: allowedOrigins.length === 1 && allowedOrigins[0] === '*'
-        ? '*'
-        : allowedOrigins,
-    methods: ['GET', 'POST'],
-})
 
 app.register(rateLimit, {
     max: 30,
@@ -33,13 +18,19 @@ app.register(rateLimit, {
     }),
 })
 
-// Set API_KEY in your .env file. Your mobile app reads it from secure storage.
 app.addHook('onRequest', async (request, reply) => {
-    if (!request.url.startsWith('/api')) return  // skip static files
+    if (!request.url.startsWith('/api')) return
 
-    const apiKey = request.headers['x-api-key']
-    if (!apiKey || apiKey !== process.env.API_KEY) {
-        return reply.status(401).send({ error: 'Unauthorized: invalid or missing API key' })
+    const authHeader = request.headers['authorization']
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return reply.status(401).send({ error: 'Unauthorized: missing token' })
+    }
+
+    const token = authHeader.split(' ')[1]
+    try {
+        jwt.verify(token, process.env.SUPABASE_JWT_SECRET as string)
+    } catch {
+        return reply.status(401).send({ error: 'Unauthorized: invalid or expired token' })
     }
 })
 

@@ -42,7 +42,8 @@ app.addHook('onRequest', async (request, reply) => {
     const token = authHeader.split(' ')[1]
     try {
         await jwtVerify(token, JWKS)
-    } catch {
+    } catch (err) {
+        console.error('[JWT] verification failed:', err)
         return reply.status(401).send({ error: 'Unauthorized: invalid or expired token' })
     }
 })

@@ -13,7 +13,7 @@ const app = fastify({ logger: false })
 // ─── JWKS — fetches Supabase's public key automatically ─────────────────────
 // Works with both old HS256 and new ECC P-256 keys, and handles future rotations.
 const JWKS = createRemoteJWKSet(
-    new URL(`${process.env.SUPABASE_URL}/auth/v1/jwks`)
+    new URL(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
 )
 
 // ─── 1. RATE LIMITING ───────────────────────────────────────────────────────
@@ -42,8 +42,7 @@ app.addHook('onRequest', async (request, reply) => {
     const token = authHeader.split(' ')[1]
     try {
         await jwtVerify(token, JWKS)
-    } catch (err) {
-        console.error('[JWT] verification failed:', err)
+    } catch {
         return reply.status(401).send({ error: 'Unauthorized: invalid or expired token' })
     }
 })

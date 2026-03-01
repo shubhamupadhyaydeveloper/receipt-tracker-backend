@@ -7,17 +7,11 @@ import rateLimit from "@fastify/rate-limit";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import receiptRoutes from "./routes/receipt-scan";
 import paymentRoutes from "./routes/payment";
-
+import { admin } from './firebase';
+import { db } from './db';
+import authRoutes from './routes/auth';
 const app = fastify({ logger: false })
 
-// ─── JWKS — fetches Supabase's public key automatically ─────────────────────
-// Works with both old HS256 and new ECC P-256 keys, and handles future rotations.
-const JWKS = createRemoteJWKSet(
-    new URL(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
-)
-
-// ─── 1. RATE LIMITING ───────────────────────────────────────────────────────
-// Max 30 requests per minute per IP
 app.register(rateLimit, {
     max: 30,
     timeWindow: '1 minute',
@@ -26,33 +20,38 @@ app.register(rateLimit, {
     }),
 })
 
-// ─── 2. SUPABASE JWT AUTH ───────────────────────────────────────────────────
-// Protects all /api/* routes.
-// The mobile app sends: Authorization: Bearer <supabase_access_token>
-// jwtVerify fetches the public key from Supabase's /auth/v1/jwks endpoint
-// and verifies the token signature — no secret needed.
-app.addHook('onRequest', async (request, reply) => {
-    if (!request.url.startsWith('/api')) return  // skip static files
+app.addHook('preHandler', async (request, reply) => {
+  // Skip auth for health check
+  if (request.url === '/health') return
 
-    const authHeader = request.headers['authorization']
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return reply.status(401).send({ error: 'Unauthorized: missing token' })
-    }
+  try {
+    const token = request.headers.authorization?.split('Bearer ')[1]
+    if (!token) return reply.status(401).send({ error: 'Unauthorized' })
 
-    const token = authHeader.split(' ')[1]
-    try {
-        await jwtVerify(token, JWKS)
-    } catch {
-        return reply.status(401).send({ error: 'Unauthorized: invalid or expired token' })
-    }
+    // Verify Firebase token
+    const decoded = await admin.auth().verifyIdToken(token)
+
+    // Get Neon user from firebase_uid
+    const { rows } = await db.query(
+      `SELECT * FROM user_profiles WHERE firebase_uid = $1`,
+      [decoded.uid]
+    )
+
+    // Attach to request — available in every route
+    request.firebaseUser = decoded
+    request.neonUser = rows[0] || null
+  } catch (error) {
+    return reply.status(401).send({ error: 'Invalid token' })
+  }
 })
 
-// ─── PLUGINS ────────────────────────────────────────────────────────────────
 app.register(multipart)
 app.register(staticFiles, { root: path.join(__dirname, '..', 'public'), prefix: '/' })
 
-// ─── ROUTES ─────────────────────────────────────────────────────────────────
 app.register(receiptRoutes, { prefix: '/api' })
 app.register(paymentRoutes, { prefix: '/api' })
+app.register(authRoutes, { prefix: '/api' })
+
+app.get('/health', async () => ({ status: 'ok' }))
 
 export default app

@@ -26,12 +26,12 @@ const schema: Schema = {
             ],
         },
     },
-    required: ["vendorName", "totalAmount", "currency", "taxAmount","date","category"],
+    required: ["vendorName", "totalAmount", "currency", "taxAmount", "date", "category"],
 }
 
 const receiptRoutes = async (fastify: FastifyInstance) => {
     fastify.post('/receipt-scan', async (request, reply) => {
-        console.log("hit the api")
+        console.log('[receipt-scan] request received')
         const data: MultipartFile | undefined = await request.file()
 
         if (!data) {
@@ -41,15 +41,19 @@ const receiptRoutes = async (fastify: FastifyInstance) => {
         const buffer = await data.toBuffer()
 
         // Step 1: Compress image with sharp to reduce Gemini token cost
+        // - 800px max width (receipts don't need high res)
+        // - grayscale (receipts are B&W, halves file size)
+        // - quality 50 (enough for text extraction)
         const compressedImage = await sharp(buffer)
-            .resize({ width: 1024, withoutEnlargement: true })
-            .jpeg({ quality: 70 })
+            .resize({ width: 800, withoutEnlargement: true })
+            .grayscale()
+            .jpeg({ quality: 50 })
             .toBuffer()
 
         // Step 2: Send compressed image to Gemini for extraction
         const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string)
         const model = gemini.getGenerativeModel({
-            model: "gemini-2.0-flash-lite",
+            model: "gemini-2.0-flash",
             generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: schema,
@@ -57,6 +61,7 @@ const receiptRoutes = async (fastify: FastifyInstance) => {
         });
 
         const prompt = "Extract all details from this receipt image accurately.";
+        console.log('[receipt-scan] sending to Gemini, image size:', compressedImage.length, 'bytes')
 
         try {
             const result = await model.generateContent([prompt, {
@@ -66,6 +71,7 @@ const receiptRoutes = async (fastify: FastifyInstance) => {
                 }
             }])
 
+            console.log('[receipt-scan] Gemini responded ok')
             const receiptData = JSON.parse(result.response.text());
             return reply.send(receiptData);
         } catch (err: unknown) {

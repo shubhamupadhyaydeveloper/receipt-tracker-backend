@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { db } from "../db";
 
 const authRoutes = (app: FastifyInstance) => {
-    app.post("/auth/sync", async (request, reply) => {
+    app.post("/auth/sync", async (request, _reply) => {
         const { firebaseUser } = request
 
         const { rows } = await db.query(`

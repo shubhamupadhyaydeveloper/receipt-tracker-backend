@@ -4,7 +4,6 @@ import fastify from "fastify";
 import multipart from "@fastify/multipart";
 import staticFiles from "@fastify/static";
 import rateLimit from "@fastify/rate-limit";
-import { createRemoteJWKSet, jwtVerify } from "jose";
 import receiptRoutes from "./routes/receipt-scan";
 import paymentRoutes from "./routes/payment";
 import { admin } from './firebase';
@@ -40,8 +39,10 @@ app.addHook('preHandler', async (request, reply) => {
     // Attach to request — available in every route
     request.firebaseUser = decoded
     request.neonUser = rows[0] || null
-  } catch (error) {
-    return reply.status(401).send({ error: 'Invalid token' })
+  } catch (error:unknown) {
+    console.error('Error verifying Firebase token:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return reply.status(401).send({ error: 'Invalid token', details: errorMessage })
   }
 })
 

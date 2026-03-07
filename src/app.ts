@@ -52,6 +52,6 @@ app.register(paymentRoutes, { prefix: '/api' })
 app.register(authRoutes, { prefix: '/api' })
 app.register(createReceiptsRoute, { prefix: '/api' })
 
-app.get('/health', async () => ({ status: 'ok' }))
+app.get('/api/health', async () => ({ status: 'ok' }))
 
 export default app

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BillSnap – Pricing</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #ffffff;
+      color: #111111;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 20px 24px;
+    }
+
+    /* ── Logo + Brand ── */
+    .header { text-align: center; margin-bottom: 36px; }
+    .logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+    .logo-wrap img { width: 44px; height: 44px; border-radius: 10px; }
+    .brand-name {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #111111;
+    }
+    .header p { color: #888; font-size: 15px; margin-top: 6px; }
+
+    /* ── Toggle ── */
+    .toggle {
+      display: flex;
+      background: #f0f0f0;
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 20px;
+    }
+    .toggle button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 9px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: transparent;
+      color: #888;
+    }
+    .toggle button.active {
+      background: #111111;
+      color: #ffffff;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #f8f8f8;
+      border: 1px solid #e5e5e5;
+      border-radius: 16px;
+      padding: 28px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #dcfce7;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+
+    .price { margin-bottom: 20px; }
+    .price .amount { font-size: 42px; font-weight: 800; color: #111111; }
+    .price .period { font-size: 16px; color: #888; margin-left: 4px; }
+    .price .original {
+      font-size: 14px;
+      color: #aaa;
+      text-decoration: line-through;
+      margin-top: 4px;
+    }
+
+    /* ── Features ── */
+    .features { list-style: none; margin-bottom: 28px; }
+    .features li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: #444;
+      padding: 7px 0;
+      border-bottom: 1px solid #efefef;
+    }
+    .features li:last-child { border-bottom: none; }
+    .features li::before {
+      content: '✓';
+      color: #16a34a;
+      font-weight: 700;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    /* ── Button ── */
+    .pay-btn {
+      width: 100%;
+      padding: 14px;
+      background: #111111;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .pay-btn:hover    { opacity: 0.82; }
+    .pay-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Footer ── */
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+      color: #aaa;
+    }
+    .footer a { color: #888; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script>
+    // Receive Firebase auth token from React Native WebView
+    let authToken = null;
+    window.addEventListener('message', function(event) {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.token) authToken = data.token;
+      } catch {}
+    });
+  </script>
+
+  <script type="text/babel">
+    const PLANS = {
+      monthly: {
+        label: 'Monthly',
+        amount: 149,
+        amountPaise: 14900,
+        period: '/month',
+        badge: null,
+        original: null,
+      },
+      yearly: {
+        label: 'Yearly',
+        amount: 2499,
+        amountPaise: 249900,
+        period: '/year',
+        badge: 'Save 30%',
+        original: '₹3,588/year',
+      },
+    };
+
+    const FEATURES = [
+      'Unlimited receipt scans',
+      'AI-powered data extraction',
+      'Export to CSV & PDF',
+      'Priority support',
+    ];
+
+    const API_BASE = 'https://receipt-tracker-backend.vercel.app';
+
+    function App() {
+      const [billing, setBilling] = React.useState('monthly');
+      const [loading, setLoading] = React.useState(false);
+      const plan = PLANS[billing];
+
+      async function handlePay() {
+        setLoading(true);
+        try {
+          if (!authToken) throw new Error('Not authenticated. Please reopen this page from the app.');
+          const res = await fetch(`${API_BASE}/api/payment/create-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+            body: JSON.stringify({ plan: billing }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to create order');
+
+          const options = {
+            key: data.keyId,
+            amount: data.amount,
+            currency: data.currency,
+            name: 'BillSnap',
+            description: `${plan.label} Subscription`,
+            order_id: data.orderId,
+            handler: async function (response) {
+              const verify = await fetch(`${API_BASE}/api/payment/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                body: JSON.stringify(response),
+              });
+              const result = await verify.json();
+              if (result.success) {
+                alert('Payment successful! Welcome to BillSnap.');
+              } else {
+                alert('Payment verification failed. Contact support.');
+              }
+            },
+            theme: { color: '#111111' },
+          };
+
+          const rzp = new window.Razorpay(options);
+          rzp.open();
+        } catch (err) {
+          alert(err.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      return (
+        <div className="container">
+          <div className="header">
+            <div className="logo-wrap">
+              <img src="/logo.png" alt="BillSnap logo" />
+              <span className="brand-name">BillSnap</span>
+            </div>
+            <p>Scan receipts. Track expenses. Effortlessly.</p>
+          </div>
+
+          <div className="toggle">
+            <button className={billing === 'monthly' ? 'active' : ''} onClick={() => setBilling('monthly')}>Monthly</button>
+            <button className={billing === 'yearly'  ? 'active' : ''} onClick={() => setBilling('yearly')}>Yearly</button>
+          </div>
+
+          <div className="card">
+            {plan.badge && <span className="badge">{plan.badge}</span>}
+
+            <div className="price">
+              <span className="amount">₹{plan.amount.toLocaleString()}</span>
+              <span className="period">{plan.period}</span>
+              {plan.original && <div className="original">{plan.original}</div>}
+            </div>
+
+            <ul className="features">
+              {FEATURES.map(f => <li key={f}>{f}</li>)}
+            </ul>
+
+            <button className="pay-btn" onClick={handlePay} disabled={loading}>
+              {loading ? 'Processing…' : 'Get BillSnap'}
+            </button>
+          </div>
+
+          <div className="footer">
+            <p>Secure payments by Razorpay &nbsp;·&nbsp; <a href="/privacy-policy.html">Privacy Policy</a></p>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

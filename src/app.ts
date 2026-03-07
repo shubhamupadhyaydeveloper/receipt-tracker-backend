@@ -1,14 +1,13 @@
 import 'dotenv/config';
-import path from 'path';
 import fastify from "fastify";
 import multipart from "@fastify/multipart";
-import staticFiles from "@fastify/static";
 import rateLimit from "@fastify/rate-limit";
 import receiptRoutes from "./routes/receipt-scan";
 import paymentRoutes from "./routes/payment";
 import { admin } from './firebase';
 import { db } from './db';
 import authRoutes from './routes/auth';
+import createReceiptsRoute from './routes/create-receipts';
 const app = fastify({ logger: false })
 
 app.register(rateLimit, {
@@ -20,8 +19,8 @@ app.register(rateLimit, {
 })
 
 app.addHook('preHandler', async (request, reply) => {
-  // Skip auth for health check
-  if (request.url === '/health') return
+  // Skip auth for static files and health check — only protect /api routes
+  if (!request.url.startsWith('/api')) return
 
   try {
     const token = request.headers.authorization?.split('Bearer ')[1]
@@ -47,11 +46,11 @@ app.addHook('preHandler', async (request, reply) => {
 })
 
 app.register(multipart)
-app.register(staticFiles, { root: path.join(__dirname, '..', 'public'), prefix: '/' })
 
 app.register(receiptRoutes, { prefix: '/api' })
 app.register(paymentRoutes, { prefix: '/api' })
 app.register(authRoutes, { prefix: '/api' })
+app.register(createReceiptsRoute, { prefix: '/api' })
 
 app.get('/health', async () => ({ status: 'ok' }))
 

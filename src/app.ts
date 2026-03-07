@@ -48,7 +48,9 @@ app.addHook('preHandler', async (request, reply) => {
 })
 
 app.register(multipart)
-app.register(staticFiles, { root: path.join(__dirname, '..', 'public'), prefix: '/' })
+if (!process.env.VERCEL) {
+  app.register(staticFiles, { root: path.join(__dirname, '..', 'public'), prefix: '/' })
+}
 
 app.register(receiptRoutes, { prefix: '/api' })
 app.register(paymentRoutes, { prefix: '/api' })

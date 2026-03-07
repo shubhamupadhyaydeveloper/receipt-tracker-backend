@@ -2,11 +2,10 @@
   "version": 2,
   "functions": {
     "api/index.ts": {
-      "maxDuration": 60,
-      "includeFiles": "public/**"
+      "maxDuration": 60
     }
   },
   "routes": [
-    { "src": "/(.*)", "dest": "/api/index.ts" }
+    { "src": "/api/(.*)", "dest": "/api/index.ts" }
   ]
 }

@@ -152,12 +152,16 @@
   <script>
     // Receive Firebase auth token from React Native WebView
     let authToken = null;
-    window.addEventListener('message', function(event) {
+    function handleRNMessage(event) {
       try {
         const data = JSON.parse(event.data);
+        console.log('Received message from React Native:', data);
         if (data.token) authToken = data.token;
       } catch {}
-    });
+    }
+    // iOS fires on window, Android fires on document
+    window.addEventListener('message', handleRNMessage);
+    document.addEventListener('message', handleRNMessage);
   </script>
 
   <script type="text/babel">
@@ -194,9 +198,12 @@
       const [loading, setLoading] = React.useState(false);
       const plan = PLANS[billing];
 
+    
+
       async function handlePay() {
         setLoading(true);
         try {
+          console.log('Auth token:', authToken);
           if (!authToken) throw new Error('Not authenticated. Please reopen this page from the app.');
           const res = await fetch(`${API_BASE}/api/payment/create-order`, {
             method: 'POST',

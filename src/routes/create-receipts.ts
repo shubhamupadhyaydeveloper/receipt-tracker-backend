@@ -8,10 +8,10 @@ import { storeImage } from "../lib/storeImage";
 
 // Required fields and their expected types for the 'data' multipart field
 const REQUIRED_FIELDS: { key: keyof CreateReceiptBody; type: string }[] = [
-    { key: 'vendorName',  type: 'string' },
+    { key: 'vendorName', type: 'string' },
     { key: 'totalAmount', type: 'number' },
-    { key: 'currency',    type: 'string' },
-    { key: 'category',    type: 'string' },
+    { key: 'currency', type: 'string' },
+    { key: 'category', type: 'string' },
     { key: 'receiptDate', type: 'string' },
 ]
 
@@ -35,6 +35,10 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
                 imageBuffer = await (part as MultipartFile).toBuffer()
             } else if (part.fieldname === 'data') {
                 receiptData = JSON.parse(part.value as string)
+            } else {
+                // Support individual fields like vendorName, totalAmount, etc.
+                receiptData = receiptData ?? {}
+                receiptData[part.fieldname as keyof CreateReceiptBody] = part.value as any
             }
         }
 
@@ -55,7 +59,7 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
         const data = receiptData as CreateReceiptBody
 
         // Upload image to ImageKit → get public URL
-        let image_url:  string | null = null
+        let image_url: string | null = null
         let image_path: string | null = null
 
         if (imageBuffer) {
@@ -64,7 +68,7 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
                 .jpeg({ quality: 60, progressive: true })
                 .toBuffer()
             const stored = await storeImage(compressed, `receipt_${Date.now()}.jpg`)
-            image_url  = stored.url
+            image_url = stored.url
             image_path = stored.filePath
         }
 
@@ -80,13 +84,13 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
             neonUser.id,
             data.vendorName,
             data.totalAmount,
-            data.taxAmount   ?? null,
+            data.taxAmount ?? null,
             data.currency,
             data.receiptDate,
             data.category,
-            data.notes       ?? null,
-            data.isGstBill   ?? false,
-            data.gstNumber   ?? null,
+            data.notes ?? null,
+            data.isGstBill ?? false,
+            data.gstNumber ?? null,
             image_url,
             image_path,
         ])

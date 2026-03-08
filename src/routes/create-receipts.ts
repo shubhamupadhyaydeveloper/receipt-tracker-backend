@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { MultipartFile } from "@fastify/multipart";
+import sharp from "sharp";
 import { db } from "../db";
 import { Receipt } from "../db/types";
 import { CreateReceiptBody } from "../types/payloads";
@@ -37,7 +38,6 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
             }
         }
 
-        // ─── Payload Validation ──────────────────────────────────────────────
         if (!receiptData) {
             return reply.status(400).send({ error: "'data' field is required" })
         }
@@ -59,7 +59,11 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
         let image_path: string | null = null
 
         if (imageBuffer) {
-            const stored = await storeImage(imageBuffer, `receipt_${Date.now()}.jpg`)
+            const compressed = await sharp(imageBuffer)
+                .resize({ width: 800, withoutEnlargement: true })
+                .jpeg({ quality: 60, progressive: true })
+                .toBuffer()
+            const stored = await storeImage(compressed, `receipt_${Date.now()}.jpg`)
             image_url  = stored.url
             image_path = stored.filePath
         }

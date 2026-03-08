@@ -4,6 +4,7 @@ import sharp from 'sharp'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { SchemaType } from '@google/generative-ai'
 import { Schema } from '@google/generative-ai'
+import { db } from '../db';
 
 const schema: Schema = {
     type: SchemaType.OBJECT,
@@ -33,6 +34,11 @@ const receiptRoutes = async (fastify: FastifyInstance) => {
     fastify.post('/receipt-scan', async (request, reply) => {
         console.log('[receipt-scan] request received')
         const data: MultipartFile | undefined = await request.file()
+
+        const {neonUser} = request
+        if (!neonUser) {
+            return reply.status(401).send({ error: 'User not found' })
+        }
 
         if (!data) {
             return reply.status(400).send({ error: 'No file uploaded' })
@@ -71,7 +77,12 @@ const receiptRoutes = async (fastify: FastifyInstance) => {
                 }
             }])
 
-            console.log('[receipt-scan] Gemini responded ok')
+            await db.query(
+                `UPDATE user_profiles SET receipts_scanned_this_month = receipts_scanned_this_month + 1 WHERE id = $1`,
+                [neonUser.id]
+            )
+
+
             const receiptData = JSON.parse(result.response.text());
             return reply.send(receiptData);
         } catch (err: unknown) {

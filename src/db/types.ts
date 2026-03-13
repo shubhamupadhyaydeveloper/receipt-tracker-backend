@@ -44,3 +44,12 @@ export interface Receipt {
     created_at:   Date
     updated_at:   Date
 }
+
+// ─── payment_sessions ─────────────────────────────────────────────────────────
+export interface PaymentSession {
+    session_id: string
+    user_id:    string
+    expires_at: Date
+    used:       boolean
+    created_at: Date
+}

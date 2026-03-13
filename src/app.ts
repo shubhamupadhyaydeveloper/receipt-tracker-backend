@@ -20,9 +20,19 @@ app.register(rateLimit, {
     }),
 })
 
+// Session-based payment routes do their own auth — skip Firebase middleware for these
+const AUTH_EXEMPT_PATHS = new Set([
+  '/api/payment/create-order-session',
+  '/api/payment/verify-session',
+])
+
 app.addHook('preHandler', async (request, reply) => {
   // Skip auth for static files and health check — only protect /api routes
   if (!request.url.startsWith('/api')) return
+
+  // Skip for session-based routes (they validate sessionId internally)
+  const urlPath = request.url.split('?')[0]
+  if (AUTH_EXEMPT_PATHS.has(urlPath)) return
 
   try {
     const token = request.headers.authorization?.split('Bearer ')[1]
@@ -56,6 +66,12 @@ app.register(receiptRoutes, { prefix: '/api' })
 app.register(paymentRoutes, { prefix: '/api' })
 app.register(authRoutes, { prefix: '/api' })
 app.register(createReceiptsRoute, { prefix: '/api' })
+
+// Serve the pricing/payment page at /payment — Chrome redirect lands here
+// On Vercel this is handled by vercel.json rewrite; reply.sendFile works locally
+app.get('/payment', async (_request, reply) => {
+  return reply.sendFile('index.html')
+})
 
 app.get('/health', async () => ({ status: 'ok' }))
 

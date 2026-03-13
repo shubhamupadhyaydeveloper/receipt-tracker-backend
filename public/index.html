@@ -149,22 +149,10 @@
 <body>
   <div id="root"></div>
 
-  <script>
-    // Receive Firebase auth token from React Native WebView
-    let authToken = null;
-    function handleRNMessage(event) {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('Received message from React Native:', data);
-        if (data.token) authToken = data.token;
-      } catch {}
-    }
-    // iOS fires on window, Android fires on document
-    window.addEventListener('message', handleRNMessage);
-    document.addEventListener('message', handleRNMessage);
-  </script>
-
   <script type="text/babel">
+    // Read sessionId from URL — set by the app before opening Chrome
+    const SESSION_ID = new URLSearchParams(window.location.search).get('session');
+
     const PLANS = {
       monthly: {
         label: 'Monthly',
@@ -198,21 +186,29 @@
       const [loading, setLoading] = React.useState(false);
       const plan = PLANS[billing];
 
-    
+      // Guard: no session in URL means the page wasn't opened from the app
+      if (!SESSION_ID) {
+        return (
+          <div className="container" style={{ textAlign: 'center', paddingTop: 60 }}>
+            <p style={{ color: '#e53e3e', fontSize: 16, fontWeight: 600 }}>Invalid payment link.</p>
+            <p style={{ color: '#888', fontSize: 14, marginTop: 8 }}>Please open this page from the BillSnap app.</p>
+          </div>
+        );
+      }
 
       async function handlePay() {
         setLoading(true);
         try {
-          console.log('Auth token:', authToken);
-          if (!authToken) throw new Error('Not authenticated. Please reopen this page from the app.');
-          const res = await fetch(`${API_BASE}/api/payment/create-order`, {
+          // Step 1: Exchange session for a Razorpay order (no token needed)
+          const res = await fetch(`${API_BASE}/api/payment/create-order-session`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
-            body: JSON.stringify({ plan: billing }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: SESSION_ID, plan: billing }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Failed to create order');
 
+          // Step 2: Open Razorpay checkout
           const options = {
             key: data.keyId,
             amount: data.amount,
@@ -221,23 +217,27 @@
             description: `${plan.label} Subscription`,
             order_id: data.orderId,
             handler: async function (response) {
-              const verify = await fetch(`${API_BASE}/api/payment/verify`, {
+              // Step 3: Verify payment server-side
+              const verify = await fetch(`${API_BASE}/api/payment/verify-session`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(response),
               });
               const result = await verify.json();
-              if (result.success) {
-                alert('Payment successful! Welcome to BillSnap.');
-              } else {
-                alert('Payment verification failed. Contact support.');
-              }
+              // Deep link back to app
+              window.location.href = result.success
+                ? 'billsnap://payment-success'
+                : 'billsnap://payment-cancelled';
+            },
+            modal: {
+              ondismiss: function () {
+                window.location.href = 'billsnap://payment-cancelled';
+              },
             },
             theme: { color: '#111111' },
           };
 
-          const rzp = new window.Razorpay(options);
-          rzp.open();
+          new window.Razorpay(options).open();
         } catch (err) {
           alert(err.message);
         } finally {

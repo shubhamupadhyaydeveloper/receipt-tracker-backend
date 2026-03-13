@@ -6,7 +6,6 @@ import { Receipt } from "../db/types";
 import { CreateReceiptBody } from "../types/payloads";
 import { storeImage } from "../lib/storeImage";
 
-// Required fields and their expected types for the 'data' multipart field
 const REQUIRED_FIELDS: { key: keyof CreateReceiptBody; type: string }[] = [
     { key: 'vendorName', type: 'string' },
     { key: 'totalAmount', type: 'number' },
@@ -106,3 +105,4 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
 }
 
 export default createReceiptsRoute;
+

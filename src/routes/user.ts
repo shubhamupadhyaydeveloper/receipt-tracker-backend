@@ -63,13 +63,14 @@ const userRoute = async (app: FastifyInstance) => {
     }
 
     const sets: string[] = []
-    const params: any[]  = []
+    const params: unknown[]  = []
     let idx = 1
+    const bodyRecord = body as Record<string, unknown>
 
     for (const [key, col] of Object.entries(fieldMap)) {
-      if ((body as any)[key] !== undefined) {
+      if (bodyRecord[key] !== undefined) {
         sets.push(`${col} = $${idx++}`)
-        params.push((body as any)[key])
+        params.push(bodyRecord[key])
       }
     }
 

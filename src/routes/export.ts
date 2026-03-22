@@ -50,12 +50,12 @@ function resolveDateRange(body: z.infer<typeof ExportBody>): { from: string; to:
   return { from: `${y}-01-01`, to: `${y}-12-31` }
 }
 
-function buildCsv(rows: any[], groupByCategory: boolean): string {
+function buildCsv(rows: Record<string, unknown>[], groupByCategory: boolean): string {
   const headers = ['Date', 'Vendor', 'Category', 'Amount', 'Tax', 'Business', 'Billable', 'Notes']
-  const escape  = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const escape  = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
 
-  const toRow = (r: any) => [
-    r.receipt_date ? new Date(r.receipt_date).toISOString().split('T')[0] : '',
+  const toRow = (r: Record<string, unknown>) => [
+    r.receipt_date ? new Date(r.receipt_date as string | number | Date).toISOString().split('T')[0] : '',
     r.vendor_name  ?? '',
     r.category     ?? '',
     r.total_amount ?? 0,
@@ -66,7 +66,7 @@ function buildCsv(rows: any[], groupByCategory: boolean): string {
   ].map(escape).join(',')
 
   const sorted = groupByCategory
-    ? [...rows].sort((a, b) => (a.category ?? '').localeCompare(b.category ?? ''))
+    ? [...rows].sort((a, b) => ((a.category as string) ?? '').localeCompare((b.category as string) ?? ''))
     : rows
 
   return [headers.join(','), ...sorted.map(toRow)].join('\n')
@@ -93,12 +93,13 @@ const exportRoute = async (app: FastifyInstance) => {
     let dateRange: { from: string; to: string }
     try {
       dateRange = resolveDateRange(body)
-    } catch (err: any) {
-      return reply.status(400).send({ error: err.message })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Invalid date range'
+      return reply.status(400).send({ error: message })
     }
 
     const conditions = ['user_id = $1', 'receipt_date >= $2', 'receipt_date <= $3']
-    const params: any[] = [neonUser.id, dateRange.from, dateRange.to]
+    const params: unknown[] = [neonUser.id, dateRange.from, dateRange.to]
 
     if (body.isBusiness === true) {
       conditions.push(`is_business = $${params.length + 1}`)

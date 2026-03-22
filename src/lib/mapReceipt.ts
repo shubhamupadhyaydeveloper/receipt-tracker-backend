@@ -5,18 +5,18 @@ export function formatCurrency(amount: number | null, currency = 'INR'): string 
 }
 
 // Maps a raw DB row to the Receipt shape the frontend expects
-export function mapReceipt(row: any) {
+export function mapReceipt(row: Record<string, unknown>) {
   return {
     id:              row.id,
     vendor:          row.vendor_name ?? null,
-    date:            row.receipt_date ? new Date(row.receipt_date).toISOString().split('T')[0] : null,
+    date:            row.receipt_date ? new Date(row.receipt_date as string | number | Date).toISOString().split('T')[0] : null,
     time:            row.receipt_time ?? null,
     category:        row.category ?? null,
     emoji:           row.emoji ?? null,
     amount:          Number(row.total_amount) || 0,
-    amountFormatted: formatCurrency(Number(row.total_amount) || 0, row.currency),
+    amountFormatted: formatCurrency(Number(row.total_amount) || 0, row.currency as string | undefined),
     tax:             Number(row.tax_amount) || 0,
-    taxFormatted:    formatCurrency(Number(row.tax_amount) || 0, row.currency),
+    taxFormatted:    formatCurrency(Number(row.tax_amount) || 0, row.currency as string | undefined),
     isBusiness:      row.is_business  ?? false,
     isBillable:      row.is_billable  ?? false,
     notes:           row.notes        ?? null,

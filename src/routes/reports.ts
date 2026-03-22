@@ -92,7 +92,7 @@ const reportsRoute = async (app: FastifyInstance) => {
       deductibleAmount: Number(r.business_total),
       billableCount:    Number(r.billable_count),
       billableAmount:   Number(r.billable_amount),
-      categories: categoriesRows.rows.map((cat: any) => ({
+      categories: categoriesRows.rows.map((cat: Record<string, unknown>) => ({
         name:    cat.category,
         emoji:   cat.emoji ?? null,
         total:   Number(cat.total),
@@ -174,11 +174,11 @@ const reportsRoute = async (app: FastifyInstance) => {
       [neonUser.id, ...params]
     )
 
-    const totalTax = rows.reduce((s: number, r: any) => s + Number(r.tax_total), 0)
+    const totalTax = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.tax_total), 0)
 
     return {
       totalTax,
-      items: rows.map((r: any) => {
+      items: rows.map((r: Record<string, unknown>) => {
         const base = Number(r.base_amount)
         const tax  = Number(r.tax_total)
         return {

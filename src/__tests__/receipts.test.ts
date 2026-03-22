@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { buildTestApp } from './helpers/buildTestApp'
 import { MOCK_RECEIPT_ROW } from './helpers/mockData'
 import receiptsRoute from '../routes/receipts'

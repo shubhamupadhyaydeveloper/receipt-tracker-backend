@@ -45,7 +45,7 @@ const receiptsRoute = async (app: FastifyInstance) => {
     const offset = (page - 1) * limit
 
     const conditions: string[] = ['user_id = $1']
-    const params: any[] = [neonUser.id]
+    const params: unknown[] = [neonUser.id]
     let idx = 2
 
     if (q.month !== undefined) {
@@ -135,13 +135,14 @@ const receiptsRoute = async (app: FastifyInstance) => {
     }
 
     const sets: string[] = []
-    const params: any[]  = []
+    const params: unknown[]  = []
     let idx = 1
+    const bodyRecord = body as Record<string, unknown>
 
     for (const [key, col] of Object.entries(fieldMap)) {
-      if ((body as any)[key] !== undefined) {
+      if (bodyRecord[key] !== undefined) {
         sets.push(`${col} = $${idx++}`)
-        params.push(key === 'items' ? JSON.stringify((body as any)[key]) : (body as any)[key])
+        params.push(key === 'items' ? JSON.stringify(bodyRecord[key]) : bodyRecord[key])
       }
     }
 

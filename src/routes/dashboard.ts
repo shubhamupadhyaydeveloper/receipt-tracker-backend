@@ -84,7 +84,7 @@ const dashboardRoute = async (app: FastifyInstance) => {
       trendDirection = 'up'
     }
 
-    const categorySum = categoriesRows.rows.reduce((s: number, r: any) => s + Number(r.total), 0) || 1
+    const categorySum = categoriesRows.rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.total), 0) || 1
 
     return {
       thisMonthTotal,
@@ -93,7 +93,7 @@ const dashboardRoute = async (app: FastifyInstance) => {
       trendDirection,
       overallTotal,
       thisMonthCount,
-      categories: categoriesRows.rows.map((r: any) => ({
+      categories: categoriesRows.rows.map((r: Record<string, unknown>) => ({
         name:    r.category,
         emoji:   r.emoji ?? null,
         total:   Number(r.total),

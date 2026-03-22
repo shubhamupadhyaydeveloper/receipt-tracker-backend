@@ -41,6 +41,8 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
             } else {
                 // Support individual fields like vendorName, totalAmount, etc.
                 receiptData = receiptData ?? {}
+                // multipart values are always strings; REQUIRED_FIELDS loop validates types below
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 receiptData[part.fieldname as keyof CreateReceiptBody] = part.value as any
             }
         }

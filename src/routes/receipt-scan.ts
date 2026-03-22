@@ -1,10 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { MultipartFile } from '@fastify/multipart';
 import sharp from 'sharp'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import { SchemaType } from '@google/generative-ai'
-import { Schema } from '@google/generative-ai'
+import { GoogleGenerativeAI, SchemaType, Schema } from '@google/generative-ai'
 import { db } from '../db';
+
+// Module-level singleton — avoids re-initialising the client on every request
+const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string)
+
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'])
 
 const schema: Schema = {
     type: SchemaType.OBJECT,
@@ -32,16 +35,19 @@ const schema: Schema = {
 
 const receiptRoutes = async (fastify: FastifyInstance) => {
     fastify.post('/receipt-scan', async (request, reply) => {
-        console.log('[receipt-scan] request received')
         const data: MultipartFile | undefined = await request.file()
 
-        const {neonUser} = request
+        const { neonUser } = request
         if (!neonUser) {
             return reply.status(401).send({ error: 'User not found' })
         }
 
         if (!data) {
             return reply.status(400).send({ error: 'No file uploaded' })
+        }
+
+        if (!ALLOWED_MIME_TYPES.has(data.mimetype)) {
+            return reply.status(400).send({ error: 'Invalid file type. Only JPEG, PNG, WebP, and HEIC images are supported.' })
         }
 
         const buffer = await data.toBuffer()
@@ -57,9 +63,8 @@ const receiptRoutes = async (fastify: FastifyInstance) => {
             .toBuffer()
 
         // Step 2: Send compressed image to Gemini for extraction
-        const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string)
         const model = gemini.getGenerativeModel({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash-lite",
             generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: schema,
@@ -67,7 +72,7 @@ const receiptRoutes = async (fastify: FastifyInstance) => {
         });
 
         const prompt = "Extract all details from this receipt image accurately.";
-        console.log('[receipt-scan] sending to Gemini, image size:', compressedImage.length, 'bytes')
+        request.log.info({ imageSize: compressedImage.length }, '[receipt-scan] sending to Gemini')
 
         try {
             const result = await model.generateContent([prompt, {
@@ -77,16 +82,17 @@ const receiptRoutes = async (fastify: FastifyInstance) => {
                 }
             }])
 
+            const receiptData = JSON.parse(result.response.text());
+
+            // Increment usage counter only after a successful extraction
             await db.query(
                 `UPDATE user_profiles SET receipts_scanned_this_month = receipts_scanned_this_month + 1 WHERE id = $1`,
                 [neonUser.id]
             )
 
-
-            const receiptData = JSON.parse(result.response.text());
             return reply.send(receiptData);
         } catch (err: unknown) {
-            console.log('Error from Gemini API:', err);
+            request.log.error({ err }, 'Gemini API error')
             if (typeof err === 'object' && err !== null && 'status' in err && (err as { status: number }).status === 429) {
                 return reply.status(429).send({ error: 'Gemini API rate limit exceeded. Please wait and try again.' });
             }

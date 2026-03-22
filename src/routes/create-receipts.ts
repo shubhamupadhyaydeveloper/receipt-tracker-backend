@@ -33,7 +33,11 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
             if (part.type === 'file') {
                 imageBuffer = await (part as MultipartFile).toBuffer()
             } else if (part.fieldname === 'data') {
-                receiptData = JSON.parse(part.value as string)
+                try {
+                    receiptData = JSON.parse(part.value as string)
+                } catch {
+                    return reply.status(400).send({ error: "'data' field must be valid JSON" })
+                }
             } else {
                 // Support individual fields like vendorName, totalAmount, etc.
                 receiptData = receiptData ?? {}
@@ -62,13 +66,18 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
         let image_path: string | null = null
 
         if (imageBuffer) {
-            const compressed = await sharp(imageBuffer)
-                .resize({ width: 800, withoutEnlargement: true })
-                .jpeg({ quality: 60, progressive: true })
-                .toBuffer()
-            const stored = await storeImage(compressed, `receipt_${Date.now()}.jpg`)
-            image_url = stored.url
-            image_path = stored.filePath
+            try {
+                const compressed = await sharp(imageBuffer)
+                    .resize({ width: 800, withoutEnlargement: true })
+                    .jpeg({ quality: 60, progressive: true })
+                    .toBuffer()
+                const stored = await storeImage(compressed, `receipt_${Date.now()}.jpg`)
+                image_url = stored.url
+                image_path = stored.filePath
+            } catch (err) {
+                request.log.error({ err }, 'ImageKit upload failed')
+                return reply.status(502).send({ error: 'Image upload failed. Please try again or submit without an image.' })
+            }
         }
 
         // Insert receipt into Neon DB

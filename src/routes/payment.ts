@@ -1,8 +1,20 @@
 import { FastifyInstance } from 'fastify';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import { z } from 'zod';
 import { db } from '../db';
 import { PaymentSession, UserProfile } from '../db/types';
+
+const CreateOrderBody = z.object({
+    sessionId: z.string().uuid('sessionId must be a valid UUID'),
+    plan:      z.enum(['monthly', 'yearly']),
+})
+
+const VerifyPaymentBody = z.object({
+    razorpay_order_id:   z.string().min(1),
+    razorpay_payment_id: z.string().min(1),
+    razorpay_signature:  z.string().min(1),
+})
 
 const plans = {
     monthly: { amount: 14900, currency: 'INR', description: 'BillSnap Pro — Monthly' },
@@ -55,13 +67,14 @@ const paymentRoutes = async (fastify: FastifyInstance) => {
     // ─── POST /api/payment/create-order-session ───────────────────────────────
     // Called by the Chrome pricing page — no Firebase token required.
     // Validates + consumes the session, then creates a Razorpay order.
-    fastify.post<{ Body: { sessionId: string; plan: 'monthly' | 'yearly' } }>(
+    fastify.post(
         '/payment/create-order-session',
         async (request, reply) => {
-            const { sessionId, plan } = request.body
-
-            if (!sessionId)  return reply.status(400).send({ error: 'sessionId is required' })
-            if (!plans[plan]) return reply.status(400).send({ error: 'Invalid plan. Choose monthly or yearly.' })
+            const parsed = CreateOrderBody.safeParse(request.body)
+            if (!parsed.success) {
+                return reply.status(400).send({ error: parsed.error.issues.map(i => i.message).join('; ') })
+            }
+            const { sessionId, plan } = parsed.data
 
             // ── Fetch session ─────────────────────────────────────────────────
             const { rows } = await db.query<PaymentSession>(
@@ -90,39 +103,37 @@ const paymentRoutes = async (fastify: FastifyInstance) => {
             if (userRows.length === 0) return reply.status(404).send({ error: 'User not found' })
 
             // ── Create Razorpay order (userId stored in notes server-side) ────
-            const order = await razorpay.orders.create({
-                amount:   plans[plan].amount,
-                currency: plans[plan].currency,
-                receipt:  `receipt_${Date.now()}`,
-                notes:    { plan, userId: userRows[0].id },
-            })
-
-            return reply.send({
-                orderId:  order.id,
-                amount:   order.amount,
-                currency: order.currency,
-                keyId:    process.env.RAZORPAY_KEY_ID,
-            })
+            try {
+                const order = await razorpay.orders.create({
+                    amount:   plans[plan].amount,
+                    currency: plans[plan].currency,
+                    receipt:  `receipt_${Date.now()}`,
+                    notes:    { plan, userId: userRows[0].id },
+                })
+                return reply.send({
+                    orderId:  order.id,
+                    amount:   order.amount,
+                    currency: order.currency,
+                    keyId:    process.env.RAZORPAY_KEY_ID,
+                })
+            } catch (err) {
+                request.log.error({ err }, 'Razorpay order creation failed')
+                return reply.status(502).send({ error: 'Payment service unavailable. Please try again.' })
+            }
         }
     )
 
     // ─── POST /api/payment/verify-session ─────────────────────────────────────
     // Called by the Chrome pricing page — no Firebase token required.
     // Verifies Razorpay signature, reads userId from order notes, upgrades plan.
-    fastify.post<{
-        Body: {
-            razorpay_order_id:   string
-            razorpay_payment_id: string
-            razorpay_signature:  string
-        }
-    }>(
+    fastify.post(
         '/payment/verify-session',
         async (request, reply) => {
-            const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = request.body
-
-            if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-                return reply.status(400).send({ error: 'Missing required payment fields' })
+            const parsed = VerifyPaymentBody.safeParse(request.body)
+            if (!parsed.success) {
+                return reply.status(400).send({ error: parsed.error.issues.map(i => i.message).join('; ') })
             }
+            const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = parsed.data
 
             // ── Verify Razorpay HMAC signature ────────────────────────────────
             const generated_signature = crypto
@@ -135,8 +146,15 @@ const paymentRoutes = async (fastify: FastifyInstance) => {
             }
 
             // ── Read userId + plan from Razorpay order notes (server-authored) ─
-            const order = await razorpay.orders.fetch(razorpay_order_id)
-            const notes  = order.notes as Record<string, string>
+            let orderNotes: Record<string, string>
+            try {
+                const order = await razorpay.orders.fetch(razorpay_order_id)
+                orderNotes = order.notes as Record<string, string>
+            } catch (err) {
+                request.log.error({ err }, 'Razorpay order fetch failed')
+                return reply.status(502).send({ success: false, error: 'Payment service unavailable. Please contact support.' })
+            }
+            const notes  = orderNotes
             const plan   = notes.plan   as 'monthly' | 'yearly'
             const userId = notes.userId as string
 

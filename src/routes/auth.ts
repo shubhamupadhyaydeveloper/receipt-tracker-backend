@@ -2,8 +2,12 @@ import { FastifyInstance } from "fastify";
 import { db } from "../db";
 
 const authRoutes = (app: FastifyInstance) => {
-    app.post("/auth/sync", async (request, _reply) => {
+    app.post("/auth/sync", async (request, reply) => {
         const { firebaseUser } = request
+
+        if (!firebaseUser) {
+            return reply.status(401).send({ error: 'Unauthorized' })
+        }
 
         const { rows } = await db.query(`
             INSERT INTO user_profiles 
@@ -22,6 +26,10 @@ const authRoutes = (app: FastifyInstance) => {
             firebaseUser.email,
             firebaseUser.picture
         ])
+
+        if (!rows[0]) {
+            return reply.status(500).send({ error: 'Failed to create or retrieve user profile' })
+        }
 
         return { user: rows[0] }
     })

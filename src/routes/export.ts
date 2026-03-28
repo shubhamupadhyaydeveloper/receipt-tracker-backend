@@ -106,12 +106,16 @@ const exportRoute = async (app: FastifyInstance) => {
       params.push(true)
     }
 
+    const EXPORT_LIMIT = 5000
     const { rows } = await db.query(
-      `SELECT * FROM receipts WHERE ${conditions.join(' AND ')} ORDER BY receipt_date ASC`,
+      `SELECT * FROM receipts WHERE ${conditions.join(' AND ')} ORDER BY receipt_date ASC LIMIT ${EXPORT_LIMIT + 1}`,
       params
     )
 
-    const csvContent = buildCsv(rows, body.groupByCategory ?? false)
+    const truncated = rows.length > EXPORT_LIMIT
+    const exportRows = truncated ? rows.slice(0, EXPORT_LIMIT) : rows
+
+    const csvContent = buildCsv(exportRows, body.groupByCategory ?? false)
     const fileBuffer = Buffer.from(csvContent, 'utf-8')
 
     const label    = body.period === 'custom' ? `${dateRange.from}_to_${dateRange.to}` : body.period.replace(/_/g, '-')
@@ -122,6 +126,7 @@ const exportRoute = async (app: FastifyInstance) => {
       const uploadResult = await imagekit.upload({ file: fileBuffer, fileName, folder: '/exports' })
       const fileUrl   = imagekit.url({ path: uploadResult.filePath, signed: true, expireSeconds: 3600 })
       const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString()
+      if (truncated) reply.header('X-Export-Truncated', 'true')
       return { success: true, fileUrl, fileName, expiresAt }
     } catch (err) {
       request.log.error({ err }, 'ImageKit export upload failed')

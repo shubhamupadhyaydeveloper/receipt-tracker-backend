@@ -13,16 +13,19 @@ const TrendQuery = z.object({
 })
 
 function buildViewWhere(view: string, month: number, year: number, startIdx: number) {
+  const pad = (n: number) => String(n).padStart(2, '0')
   if (view === 'month') {
+    const start = `${year}-${pad(month)}-01`
+    const end   = month === 12 ? `${year + 1}-01-01` : `${year}-${pad(month + 1)}-01`
     return {
-      clause: `AND EXTRACT(MONTH FROM receipt_date) = $${startIdx} AND EXTRACT(YEAR FROM receipt_date) = $${startIdx + 1}`,
-      params: [month, year],
+      clause: `AND receipt_date >= $${startIdx} AND receipt_date < $${startIdx + 1}`,
+      params: [start, end],
     }
   }
   if (view === 'year') {
     return {
-      clause: `AND EXTRACT(YEAR FROM receipt_date) = $${startIdx}`,
-      params: [year],
+      clause: `AND receipt_date >= $${startIdx} AND receipt_date < $${startIdx + 1}`,
+      params: [`${year}-01-01`, `${year + 1}-01-01`],
     }
   }
   return { clause: '', params: [] }
@@ -119,9 +122,9 @@ const reportsRoute = async (app: FastifyInstance) => {
          EXTRACT(MONTH FROM receipt_date)::int AS month,
          COALESCE(SUM(total_amount), 0)        AS total
        FROM receipts
-       WHERE user_id = $1 AND EXTRACT(YEAR FROM receipt_date) = $2
+       WHERE user_id = $1 AND receipt_date >= $2 AND receipt_date < $3
        GROUP BY month`,
-      [neonUser.id, year]
+      [neonUser.id, `${year}-01-01`, `${year + 1}-01-01`]
     )
 
     const totalsMap = new Map<number, number>()

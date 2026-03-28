@@ -82,36 +82,36 @@ const createReceiptsRoute = async (app: FastifyInstance) => {
             }
         }
 
-        // Insert receipt into Neon DB
-        const { rows } = await db.query<Receipt>(`
-            INSERT INTO receipts (
-                user_id, vendor_name, total_amount, tax_amount,
-                currency, receipt_date, category, notes,
-                is_gst_bill, gst_number, image_url, image_path
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-            RETURNING *
-        `, [
-            neonUser.id,
-            data.vendorName,
-            data.totalAmount,
-            data.taxAmount ?? null,
-            data.currency,
-            data.receiptDate,
-            data.category,
-            data.notes ?? null,
-            data.isGstBill ?? false,
-            data.gstNumber ?? null,
-            image_url,
-            image_path,
+        // Insert receipt and increment usage counter in parallel — both only need neonUser.id
+        const [insertResult] = await Promise.all([
+            db.query<Receipt>(`
+                INSERT INTO receipts (
+                    user_id, vendor_name, total_amount, tax_amount,
+                    currency, receipt_date, category, notes,
+                    is_gst_bill, gst_number, image_url, image_path
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+                RETURNING *
+            `, [
+                neonUser.id,
+                data.vendorName,
+                data.totalAmount,
+                data.taxAmount ?? null,
+                data.currency,
+                data.receiptDate,
+                data.category,
+                data.notes ?? null,
+                data.isGstBill ?? false,
+                data.gstNumber ?? null,
+                image_url,
+                image_path,
+            ]),
+            db.query(
+                `UPDATE user_profiles SET receipts_scanned_this_month = receipts_scanned_this_month + 1 WHERE id = $1`,
+                [neonUser.id]
+            ),
         ])
 
-        // Increment monthly usage counter atomically in the DB
-        await db.query(
-            `UPDATE user_profiles SET receipts_scanned_this_month = receipts_scanned_this_month + 1 WHERE id = $1`,
-            [neonUser.id]
-        )
-
-        return reply.status(201).send({ receipt: rows[0] })
+        return reply.status(201).send({ receipt: insertResult.rows[0] })
     })
 }
 

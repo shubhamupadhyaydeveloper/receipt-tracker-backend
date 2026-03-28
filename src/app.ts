@@ -9,6 +9,7 @@ import receiptRoutes from "./routes/receipt-scan";
 import paymentRoutes from "./routes/payment";
 import { admin } from './firebase';
 import { db } from './db';
+import { UserProfile } from './db/types';
 import authRoutes from './routes/auth';
 import createReceiptsRoute from './routes/create-receipts';
 import receiptsRoute from './routes/receipts';
@@ -16,6 +17,10 @@ import dashboardRoute from './routes/dashboard';
 import reportsRoute from './routes/reports';
 import exportRoute from './routes/export';
 import userRoute from './routes/user';
+
+// In-memory cache for user profile lookups — avoids a DB round-trip on every request
+const userCache = new Map<string, { user: UserProfile; exp: number }>()
+const USER_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 const isProd = process.env.NODE_ENV === 'production'
 const app = fastify({
@@ -56,15 +61,28 @@ app.addHook('preHandler', async (request, reply) => {
     // Verify Firebase token
     const decoded = await admin.auth().verifyIdToken(token)
 
-    // Get Neon user from firebase_uid
-    const { rows } = await db.query(
-      `SELECT * FROM user_profiles WHERE firebase_uid = $1`,
-      [decoded.uid]
-    )
+    // Get Neon user — serve from cache to avoid a DB call on every request
+    const cached = userCache.get(decoded.uid)
+    let neonUser: UserProfile | null
+    if (cached && cached.exp > Date.now()) {
+      neonUser = cached.user
+    } else {
+      const { rows } = await db.query<UserProfile>(
+        `SELECT id, firebase_uid, full_name, email, avatar_url, plan,
+                plan_started_at, plan_expires_at, razorpay_subscription_id,
+                razorpay_customer_id, receipts_scanned_this_month,
+                last_usage_reset_at, currency, user_type, monthly_budget,
+                language, selected_categories, created_at, updated_at
+         FROM user_profiles WHERE firebase_uid = $1`,
+        [decoded.uid]
+      )
+      neonUser = rows[0] || null
+      if (neonUser) userCache.set(decoded.uid, { user: neonUser, exp: Date.now() + USER_CACHE_TTL })
+    }
 
     // Attach to request — available in every route
     request.firebaseUser = decoded
-    request.neonUser = rows[0] || null
+    request.neonUser = neonUser
   } catch (error: unknown) {
     request.log.warn({ err: error }, 'Firebase token verification failed')
     return reply.status(401).send({ error: 'Invalid token' })

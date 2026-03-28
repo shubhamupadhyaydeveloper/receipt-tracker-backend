@@ -26,22 +26,29 @@ const dashboardRoute = async (app: FastifyInstance) => {
     const lastMonth = month === 1 ? 12 : month - 1
     const lastYear  = month === 1 ? year - 1 : year
 
+    // Use date-range comparisons so the (user_id, receipt_date) index is used
+    const pad       = (n: number) => String(n).padStart(2, '0')
+    const start     = `${year}-${pad(month)}-01`
+    const end       = month === 12 ? `${year + 1}-01-01` : `${year}-${pad(month + 1)}-01`
+    const lastStart = `${lastYear}-${pad(lastMonth)}-01`
+    const lastEnd   = lastMonth === 12 ? `${lastYear + 1}-01-01` : `${lastYear}-${pad(lastMonth + 1)}-01`
+
     const [thisMonthRow, lastMonthRow, overallRow, categoriesRows, recentRows] = await Promise.all([
       db.query(
         `SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
          FROM receipts
          WHERE user_id = $1
-           AND EXTRACT(MONTH FROM receipt_date) = $2
-           AND EXTRACT(YEAR  FROM receipt_date) = $3`,
-        [userId, month, year]
+           AND receipt_date >= $2
+           AND receipt_date < $3`,
+        [userId, start, end]
       ),
       db.query(
         `SELECT COALESCE(SUM(total_amount), 0) AS total
          FROM receipts
          WHERE user_id = $1
-           AND EXTRACT(MONTH FROM receipt_date) = $2
-           AND EXTRACT(YEAR  FROM receipt_date) = $3`,
-        [userId, lastMonth, lastYear]
+           AND receipt_date >= $2
+           AND receipt_date < $3`,
+        [userId, lastStart, lastEnd]
       ),
       db.query(
         `SELECT COALESCE(SUM(total_amount), 0) AS total FROM receipts WHERE user_id = $1`,
@@ -54,13 +61,13 @@ const dashboardRoute = async (app: FastifyInstance) => {
            COALESCE(SUM(total_amount), 0) AS total
          FROM receipts
          WHERE user_id = $1
-           AND EXTRACT(MONTH FROM receipt_date) = $2
-           AND EXTRACT(YEAR  FROM receipt_date) = $3
+           AND receipt_date >= $2
+           AND receipt_date < $3
            AND category IS NOT NULL
          GROUP BY category
          ORDER BY total DESC
          LIMIT 6`,
-        [userId, month, year]
+        [userId, start, end]
       ),
       db.query(
         `SELECT * FROM receipts WHERE user_id = $1 ORDER BY receipt_date DESC, created_at DESC LIMIT 5`,

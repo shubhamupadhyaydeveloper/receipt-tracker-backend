@@ -3,7 +3,7 @@ import { UserProfile } from '../../db/types'
 
 export const MOCK_USER: UserProfile = {
   id:                          'user-uuid-123',
-  firebase_uid:                'firebase-uid-123',
+  supabase_uid:                'supabase-uid-123',
   plan:                        'free',
   full_name:                   'Test User',
   email:                       'test@example.com',
@@ -21,10 +21,10 @@ export const MOCK_USER: UserProfile = {
 export async function buildTestApp(plugin: (app: FastifyInstance) => Promise<void>) {
   const app = Fastify({ logger: false })
 
-  // Bypass Firebase auth — attach mock user directly
+  // Bypass Supabase auth — attach mock user directly
   app.addHook('preHandler', async (request) => {
     request.neonUser     = MOCK_USER
-    request.firebaseUser = { uid: MOCK_USER.firebase_uid } as any
+    request.supabaseUser = { id: MOCK_USER.supabase_uid } as any
   })
 
   app.register(plugin, { prefix: '/api' })

@@ -1,10 +1,10 @@
 import 'fastify'
-import { DecodedIdToken } from 'firebase-admin/auth'
+import { User } from '@supabase/supabase-js'
 import { UserProfile } from './src/db/types'
 
 declare module 'fastify' {
     interface FastifyRequest {
-        firebaseUser: DecodedIdToken
+        supabaseUser: User
         neonUser:     UserProfile | null
     }
 }

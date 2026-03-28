@@ -1,0 +1,40 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MOCK_RECEIPT_API = exports.MOCK_RECEIPT_ROW = void 0;
+exports.MOCK_RECEIPT_ROW = {
+    id: 'receipt-uuid-1',
+    user_id: 'user-uuid-123',
+    vendor_name: 'Test Vendor',
+    total_amount: '1200.00',
+    tax_amount: '120.00',
+    currency: 'INR',
+    receipt_date: new Date('2026-03-15'),
+    receipt_time: '14:30',
+    category: 'Food & Dining',
+    emoji: '🍕',
+    is_business: false,
+    is_billable: false,
+    items: [],
+    notes: 'Test note',
+    image_url: 'https://example.com/receipt.jpg',
+    image_path: '/receipts/receipt.jpg',
+    created_at: new Date('2026-03-15'),
+    updated_at: new Date('2026-03-15'),
+};
+exports.MOCK_RECEIPT_API = {
+    id: 'receipt-uuid-1',
+    vendor: 'Test Vendor',
+    date: '2026-03-15',
+    time: '14:30',
+    category: 'Food & Dining',
+    emoji: '🍕',
+    amount: 1200,
+    amountFormatted: '₹1,200.00',
+    tax: 120,
+    taxFormatted: '₹120.00',
+    isBusiness: false,
+    isBillable: false,
+    notes: 'Test note',
+    items: [],
+    receiptImageUrl: 'https://example.com/receipt.jpg',
+};

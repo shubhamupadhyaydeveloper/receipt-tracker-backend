@@ -3,7 +3,7 @@ export type Plan = 'free' | 'pro'
 
 export interface UserProfile {
     id:                          string
-    firebase_uid:                string
+    supabase_uid:                string
     full_name:                   string | null
     email:                       string | null
     avatar_url:                  string | null

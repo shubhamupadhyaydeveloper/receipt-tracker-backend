@@ -7,7 +7,7 @@ import rateLimit from "@fastify/rate-limit";
 import cors from "@fastify/cors";
 import receiptRoutes from "./routes/receipt-scan";
 import paymentRoutes from "./routes/payment";
-import { admin } from './firebase';
+import { supabase } from './supabase';
 import { db } from './db';
 import { UserProfile } from './db/types';
 import authRoutes from './routes/auth';
@@ -40,7 +40,7 @@ app.register(rateLimit, {
     }),
 })
 
-// Session-based payment routes do their own auth — skip Firebase middleware for these
+// Session-based payment routes do their own auth — skip Supabase middleware for these
 const AUTH_EXEMPT_PATHS = new Set([
   '/api/payment/create-order-session',
   '/api/payment/verify-session',
@@ -58,33 +58,34 @@ app.addHook('preHandler', async (request, reply) => {
     const token = request.headers.authorization?.split('Bearer ')[1]
     if (!token) return reply.status(401).send({ error: 'Unauthorized' })
 
-    // Verify Firebase token
-    const decoded = await admin.auth().verifyIdToken(token)
+    // Verify Supabase token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) return reply.status(401).send({ error: 'Unauthorized' })
 
     // Get Neon user — serve from cache to avoid a DB call on every request
-    const cached = userCache.get(decoded.uid)
+    const cached = userCache.get(user.id)
     let neonUser: UserProfile | null
     if (cached && cached.exp > Date.now()) {
       neonUser = cached.user
     } else {
       const { rows } = await db.query<UserProfile>(
-        `SELECT id, firebase_uid, full_name, email, avatar_url, plan,
+        `SELECT id, supabase_uid, full_name, email, avatar_url, plan,
                 plan_started_at, plan_expires_at, razorpay_subscription_id,
                 razorpay_customer_id, receipts_scanned_this_month,
                 last_usage_reset_at, currency, user_type, monthly_budget,
                 language, selected_categories, created_at, updated_at
-         FROM user_profiles WHERE firebase_uid = $1`,
-        [decoded.uid]
+         FROM user_profiles WHERE supabase_uid = $1`,
+        [user.id]
       )
       neonUser = rows[0] || null
-      if (neonUser) userCache.set(decoded.uid, { user: neonUser, exp: Date.now() + USER_CACHE_TTL })
+      if (neonUser) userCache.set(user.id, { user: neonUser, exp: Date.now() + USER_CACHE_TTL })
     }
 
     // Attach to request — available in every route
-    request.firebaseUser = decoded
+    request.supabaseUser = user
     request.neonUser = neonUser
   } catch (error: unknown) {
-    request.log.warn({ err: error }, 'Firebase token verification failed')
+    request.log.warn({ err: error }, 'Supabase token verification failed')
     return reply.status(401).send({ error: 'Invalid token' })
   }
 })

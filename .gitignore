@@ -23,6 +23,12 @@ web/.env.*.local
 # TypeScript
 *.tsbuildinfo
 
+# Compiled JS sitting next to TS sources (should live in build/ instead)
+src/**/*.js
+api/**/*.js
+eslint.config.mjs
+vitest.config.js
+
 # Logs
 *.log
 npm-debug.log*
